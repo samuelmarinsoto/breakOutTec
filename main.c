@@ -50,6 +50,7 @@ Texture2D background_text;
 struct Player player;
 struct Ball ball;
 BrickArray bricks;
+bool gg = false;
 
 void Game_startup(BrickArray *brick_array) {
 
@@ -68,9 +69,9 @@ void Game_startup(BrickArray *brick_array) {
     player.level = 1;
 
     //Codigo que carga a memoria datos de la bola
-    ball.accel = (Vector2) {1.0f, 1.0f};
+    ball.accel = (Vector2) {1.0f, -1.0f};
     ball.r = 5.0f;
-    ball.pos = (Vector2) {300, 300};
+    ball.pos = (Vector2) {350, 500};
     ball.vel = 300.0f;
 
     //Codigo que carga la lista de bloques
@@ -108,6 +109,8 @@ void Game_startup(BrickArray *brick_array) {
 void Game_update() {
 
     float framet = GetFrameTime();
+
+    if (gg) return;
 
     //Control del jugador sobre la barra de juego.
     if(IsKeyDown(KEY_LEFT)) {
@@ -147,9 +150,21 @@ void Game_update() {
     if (ball.pos.x > screen_w || ball.pos.x < 10) {
         ball.accel.x = ball.accel.x * -1;
     }
-    if (ball.pos.y > screen_h || ball.pos.y < 10) {
+    if (ball.pos.y < 10) {
         ball.accel.y = ball.accel.y * -1;
     }
+
+    //Chequeo de si la bola se va de la pantalla abajo para posteriormente volver a jugar pero con una vida menos.
+    if (ball.pos.y > screen_h) {
+        player.lives--;
+        ball.pos = (Vector2){350, 500};
+        ball.accel = (Vector2){1.0f, -1.0f};
+        if (player.lives <= 0) {
+            gg = true;
+        }
+        return;
+    }
+
 
     //Colision entre la bola y el jugador.
     if (CheckCollisionCircleRec(ball.pos, ball.r, player.rect)) {
@@ -223,6 +238,14 @@ void Game_render() {
 
     strcat(level_txt, level);
     DrawText(level_txt, 230, 10, 15, RAYWHITE);
+
+    if (gg) {
+        DrawText("HAS PERDIDO: TE QUEDASTE SIN VIDAS", screen_w / 2 - 200, screen_h / 2 - 10, 20, RED);
+        DrawText("PRESIONA ESC PARA SALIR", screen_w / 2 - MeasureText("Press R to restart or Q to quit", 15) / 2, screen_h / 2 + 40, 15, RAYWHITE);
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            CloseWindow(); // Exit the game
+        }
+    }
 
 }
 
