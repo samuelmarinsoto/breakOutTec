@@ -46,11 +46,45 @@ struct Player {
     float h;
 };
 
+typedef struct {
+    float time;
+    float duration;
+    bool active;
+} Timer;
+
 Texture2D background_text;
 struct Player player;
 struct Ball ball;
 BrickArray bricks;
 bool gg = false;
+
+void Spawn_bricks(BrickArray *brick_array) {
+    Brick new_brick;
+    new_brick.base.w = 50.0f;
+    new_brick.base.h = 15.0f;
+    brick_array->size = 0; // Reset size for respawning
+
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            new_brick.base.rect.x = 40 + (i * 55);
+            new_brick.base.rect.y = 50 + (j * 26);
+            new_brick.base.rect.width = new_brick.base.w;
+            new_brick.base.rect.height = new_brick.base.h;
+
+            if (j < 2) {
+                new_brick.color = RED;
+            } else if (j < 4) {
+                new_brick.color = ORANGE;
+            } else if (j < 6) {
+                new_brick.color = YELLOW;
+            } else {
+                new_brick.color = GREEN;
+            }
+
+            brick_array->data[brick_array->size++] = new_brick;
+        }
+    }
+}
 
 void Game_startup(BrickArray *brick_array) {
 
@@ -61,7 +95,7 @@ void Game_startup(BrickArray *brick_array) {
 
     //Codigo que carga a memoria datos del jugador
     player.rect = (Rectangle) {250.0f, 540.0f, 75.0f, 10.0f};
-    player.velocity = 350.0f;
+    player.velocity = 450.0f;
     player.score = 0;
     player.w = 75.0f;
     player.h = 10.0f;
@@ -79,31 +113,8 @@ void Game_startup(BrickArray *brick_array) {
     brick_array->capacity = 64; // Initial capacity (adjust as needed)
     brick_array->data = (Brick *)malloc(brick_array->capacity * sizeof(Brick));
 
-    //Codigo que carga en memoria los bloues a utilizar
-    Brick new_brick;
-    new_brick.base.w = 50.0f;
-    new_brick.base.h = 15.0f;
-    for (int i =0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+    Spawn_bricks(brick_array);
 
-            new_brick.base.rect.x = 40 + (i * 55);
-            new_brick.base.rect.y = 50 + (j * 26);
-            new_brick.base.rect.width = new_brick.base.w;
-            new_brick.base.rect.height = new_brick.base.h;
-
-            if (j < 2) {
-                new_brick.color = RED;         // Rojo las filas 0 y 1
-            } else if (j < 4) {
-                new_brick.color = ORANGE;      // Naranja las filas 2 y 3
-            } else if (j < 6) {
-                new_brick.color = YELLOW;      // Amarillo las filas 4 y 5
-            } else {
-                new_brick.color = GREEN;       // Verde las filas 6 y 7
-            }
-
-            brick_array->data[brick_array->size++] = new_brick;
-        }
-    }
 }
 
 void Game_update() {
@@ -124,7 +135,7 @@ void Game_update() {
     ball.pos.x = ball.pos.x + ((ball.vel * ball.accel.x) * framet);
     ball.pos.y = ball.pos.y + ((ball.vel * ball.accel.y) * framet);
 
-    //------------------Seccion de colisiones----------------------
+    //------------------Seccion de colisiones y otras interacciones del juego----------------------
 
     //Colision entre la bola y los bloques.
     for (int i = 0; i < bricks.size; i++) {
@@ -144,6 +155,15 @@ void Game_update() {
             i--;
             break;
         }
+    }
+
+    //Chequeo de si todos los bloues estan destruidos, si ese es el caso, se aumenta el nivel, se reestablecen los bloques y se aumenta la velocidad de la bola.
+    if (bricks.size == 0) {
+        player.level++;
+        ball.vel *= 1.2f;
+        ball.accel = (Vector2) {1.0f, -1.0f};
+        ball.pos = (Vector2) {350, 500};
+        Spawn_bricks(&bricks);
     }
 
     //Colision entre la bola y las paredes, se invierte la aceleracion pues el choque causa cambio a direccion contraria.
@@ -251,6 +271,7 @@ void Game_render() {
 
 void Game_shutdown() {
 
+    free(bricks.data);
 
 }
 
