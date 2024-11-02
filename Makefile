@@ -7,9 +7,9 @@ LDFLAGS = -lraylib -lm -ldl -lpthread -lGL -lX11
 CSRC_DIR := cliente
 JAVASRC_DIR := servidor
 BUILD_DIR := build
-PACKAGE := com.server
-JAVA_SOURCES := $(wildcard $(JAVASRC_DIR)/$(PACKAGE)/*.java)
-CLASS_FILES := $(patsubst $(JAVASRC_DIR)/$(PACKAGE)/%.java,$(BUILD_DIR)/$(PACKAGE)/%.class,$(JAVA_SOURCES))
+
+JAVA_SOURCES := $(wildcard $(JAVASRC_DIR)/*.java)
+CLASS_FILES := $(patsubst $(JAVASRC_DIR)/%.java,$(BUILD_DIR)/%.class,$(JAVA_SOURCES))
 JAR := $(BUILD_DIR)/servidor.jar
 
 # Targets
@@ -21,24 +21,30 @@ all: $(TARGET) $(JAR)
 
 $(BUILD_DIR):
 	mkdir -p $@
-
-$(BUILD_DIR)/$(PACKAGE): $(BUILD_DIR)
-	mkdir -p $@
 	
 # Compile C program
 $(TARGET): $(C_SRC) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(C_SRC) -o $(TARGET) $(LDFLAGS)
 
+testclient: $(BUILD_DIR)
+	$(CC) $(CFLAGS) client.c -o build/client $(LDFLAGS)
+
+startgame: $(TARGET)
+	./$(TARGET)
+
 # Compile Java files
-$(BUILD_DIR)/%.class: $(SRC_DIR)/$(PACKAGE)/%.java | $(BUILD_DIR)/$(PACKAGE)
+$(BUILD_DIR)/%.class: $(JAVASRC_DIR)/%.java | $(BUILD_DIR)
 	javac -d $(BUILD_DIR) $<
 
 # Create JAR file
-$(JAR_FILE): $(CLASS_FILES)
-	jar cf $@ -C $(BUILD_DIR) .
+$(JAR): $(CLASS_FILES)
+	jar cmf $(JAVASRC_DIR)/manifest.txt $@ -C $(BUILD_DIR) .
 
+startserver: $(JAR)
+	java -jar $(JAR)
+	
 # Clean build directory
 clean:
 	rm -f $(BUILD_DIR)/*
 
-.PHONY: all clean
+.PHONY: all clean startserver startgame
