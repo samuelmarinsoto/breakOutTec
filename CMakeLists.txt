@@ -9,6 +9,7 @@ include_directories(${RAYLIB_DIR}/include)
 
 link_directories(${RAYLIB_DIR}/lib)
 
-add_executable(untitled1 main.c)
+add_executable(untitled1 main.c
+        constants.h)
 
 target_link_libraries(untitled1 raylib m pthread dl)
