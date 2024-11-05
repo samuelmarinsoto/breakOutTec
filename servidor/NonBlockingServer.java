@@ -8,9 +8,11 @@ public class NonBlockingServer {
 
     private static final int PORT = 12345;
 
-    public static void main(String[] args) {
-        try {
-            // 1. Open a ServerSocketChannel in non-blocking mode
+    private static final Selector selector
+
+	public static void start(){
+		try {
+			 // 1. Open a ServerSocketChannel in non-blocking mode
             ServerSocketChannel serverChannel = ServerSocketChannel.open();
             serverChannel.configureBlocking(false);
             serverChannel.bind(new InetSocketAddress(PORT));
@@ -22,8 +24,13 @@ public class NonBlockingServer {
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
             System.out.println("Server started. Listening on port " + PORT);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+    public static void main(String[] args) {
+        try {
 
-            // 3. Server loop to process events
             while (true) {
                 // Wait for an event (blocking call with no timeout)
                 selector.select();
