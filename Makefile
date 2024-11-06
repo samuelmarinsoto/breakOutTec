@@ -6,6 +6,7 @@ LDFLAGS = -lraylib -lm -ldl -lpthread -lGL -lX11
 # Java settings
 CSRC_DIR := cliente
 JAVASRC_DIR := servidor
+JAVALIB_DIR := servidor/lib
 BUILD_DIR := build
 
 JAVA_SOURCES := $(wildcard $(JAVASRC_DIR)/*.java)
@@ -32,9 +33,14 @@ testclient: $(BUILD_DIR)
 startgame: $(TARGET)
 	./$(TARGET)
 
+# Download external libraries
+java_lib:
+	mkdir -p $(JAVALIB_DIR)
+	curl -L -o $(JAVALIB_DIR)/json-20240303.jar "https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar"
+
 # Compile Java files
-$(BUILD_DIR)/%.class: $(JAVASRC_DIR)/%.java | $(BUILD_DIR)
-	javac -d $(BUILD_DIR) $<
+$(CLASS_FILES): $(JAVA_SOURCES) java_lib | $(BUILD_DIR)
+	javac -d $(BUILD_DIR) $< -cp $(JAVALIB_DIR)
 
 # Create JAR file
 $(JAR): $(CLASS_FILES)
