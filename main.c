@@ -4,7 +4,105 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <json-c/json.h>
 #include "constants.h"
+
+//Definicion de ip local y puerto de conexion del juego
+#define SERVER_IP "127.0.0.1"
+#define SERVER_PORT 8080
+
+int extra_life_brick_indexes[64];  // Array for storing the brick indexes that give extra life
+int increase_speed_brick_indexes[64];  // Array for storing the brick indexes that increase speed
+int decrease_speed_brick_indexes[64];  // Array for storing the brick indexes that decrease speed
+
+int extra_life_count = 0;  // Track the number of active "extra life" bricks
+int increase_speed_count = 0;  // Track the number of active "increase speed" bricks
+int decrease_speed_count = 0;
+
+//------------------Seccion de comunicacion mediante JSONs y sockets----------------------
+
+int create_socket() {
+    int sock = socket(AF_INET, SOCK_STREAM, 0); //Crea el socket para la recepcion de mensajes
+    if (sock < 0) { //Chequeo de si se creo el socket correctamente
+        perror("Socket fallo en crearse");
+        exit(EXIT_FAILURE);
+    }
+    return sock; //Da el socket creado
+}
+
+void connect_to_server(int sock) {
+    struct sockaddr_in server_address;
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(SERVER_PORT);
+    server_address.sin_addr.s_addr = inet_addr(SERVER_IP);
+
+    if (connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+        perror("La conexion con el server ha fallado");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void receive_json(int sock, char *buffer, size_t buffer_size) {
+    int bytes_received = recv(sock, buffer, buffer_size - 1, 0);
+    if (bytes_received < 0) {
+        perror("No se recibieron los datos correctamente");
+        exit(EXIT_FAILURE);
+    }
+    buffer[bytes_received] = '\0';
+}
+
+void handle_json_message(const char *json_string) {
+    struct json_object *parsed_json;
+    struct json_object *brick_index;
+    struct json_object *extra_life;
+    struct json_object *increase_ball_speed;
+    struct json_object *decrease_ball_speed;
+
+    parsed_json = json_tokener_parse(json_string);
+    if (!parsed_json) {
+        printf("Error parseando el JSON\n");
+        return;
+    }
+
+    json_object_object_get_ex(parsed_json, "brick_index", &brick_index);
+    json_object_object_get_ex(parsed_json, "extra_life", &extra_life);
+    json_object_object_get_ex(parsed_json, "increase_ball_speed", &increase_ball_speed);
+    json_object_object_get_ex(parsed_json, "decrease_ball_speed", &decrease_ball_speed);
+
+    int index = json_object_get_int(brick_index);
+    bool extraLife = json_object_get_boolean(extra_life);
+    bool increaseSpeed = json_object_get_boolean(increase_ball_speed);
+    bool decreaseSpeed = json_object_get_boolean(decrease_ball_speed);
+
+    if (extraLife && extra_life_count < ba_size) {
+        extra_life_brick_indexes[extra_life_count++] = index;
+    }
+
+    if (increaseSpeed && increase_speed_count < ba_size) {
+        increase_speed_brick_indexes[increase_speed_count++] = index;
+    }
+
+    if (decreaseSpeed && decrease_speed_count < ba_size) {
+        decrease_speed_brick_indexes[decrease_speed_count++] = index;
+    }
+
+    json_object_put(parsed_json);
+}
+
+void RemovePowerUpBrickIndex(int brickIndexes[], int *count, int index) {
+    for (int i = 0; i < *count; i++) {
+        if (brickIndexes[i] == index) {
+            for (int j = i; j < *count - 1; j++) {
+                brickIndexes[j] = brickIndexes[j + 1];
+            }
+            (*count)--;
+            break;
+        }
+    }
+}
 
 //------------------Seccion de definicion de estructuras a usar y otros elementos previo al inicio del juego----------------------
 //Estructura que define las dimensiones que deben de tener todos los bloques. Crea el estandar del resto de bloques: Fabrica de bloques.
@@ -55,6 +153,8 @@ struct Ball ball; //Declaracion de una jugador
 BrickArray bricks; //Declaracion de una lista de bloques dinamica
 bool gg = false; //Declaracion de condicion de derrota como booleano
 
+
+
 //------------------Seccion de creacion de bloques----------------------
 void Spawn_bricks(BrickArray *brick_array) {
     Brick new_brick; //Crea un nuevo bloque para la lista
@@ -78,6 +178,7 @@ void Spawn_bricks(BrickArray *brick_array) {
             } else { //Asigna el color verde a las ultimas 2 filas de la matriz
                 new_brick.color = GREEN;
             }
+
 
             brick_array->data[brick_array->size++] = new_brick; //Se indica que hubo un aumento en el total de bloques de la lista.
         }
@@ -141,15 +242,47 @@ void Game_update() {
 
     //Colision entre la bola y los bloques.
     for (int i = 0; i < bricks.size; i++) {
-        Brick brick = bricks.data[i];
+        Brick *brick = &bricks.data[i];
         if (CheckCollisionCircleRec( //Va chequeando si se detecta una colision con un bloque.
             ball.pos,
             ball.r,
-            brick.base.rect
+            brick->base.rect
         )) {
             ball.accel.y = ball.accel.y * -1; //Cambia la direccion de la bola
             player.score = player.score + 10; // Actualiza el puntaje del juego
-            for (int j = i; j < bricks.size - 1; j++) {
+
+            //Manejo de poderes enviados por el server:
+
+            for (int j = 0; j < extra_life_count; j++) {
+                if (i == extra_life_brick_indexes[j]) {
+                    player.lives += 1;
+                    printf("Se ha obtenido una vida extra. Vidas: %d\n", player.lives);
+                    RemovePowerUpBrickIndex(extra_life_brick_indexes, &extra_life_count, i);
+                    break; //
+                }
+            }
+
+            // Check for increase speed power-ups
+            for (int j = 0; j < increase_speed_count; j++) {
+                if (i == increase_speed_brick_indexes[j]) {
+                    ball.vel *= 1.1f;  // Increase speed by 10%
+                    printf("La velocidad de la bola ha subido. Velocidad actual: %.2f\n", ball.vel);
+                    RemovePowerUpBrickIndex(increase_speed_brick_indexes, &increase_speed_count, i);
+                    break;
+                }
+            }
+
+            // Check for decrease speed power-ups
+            for (int j = 0; j < decrease_speed_count; j++) {
+                if (i == decrease_speed_brick_indexes[j]) {
+                    ball.vel *= 0.9f;
+                    printf("La velocidad de la bola ha bajado. Velocidad actual: %.2f\n", ball.vel);
+                    RemovePowerUpBrickIndex(decrease_speed_brick_indexes, &decrease_speed_count, i);
+                    break;
+                }
+            }
+
+            for (int j = i; j < bricks.size - 1; j++) { //Se elimina el bloque de la lista.
                 bricks.data[j] = bricks.data[j + 1];
             }
 
