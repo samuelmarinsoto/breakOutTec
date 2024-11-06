@@ -9,8 +9,10 @@ JAVASRC_DIR := servidor
 JAVALIB_DIR := servidor/lib
 BUILD_DIR := build
 
-JAVA_SOURCES := $(wildcard $(JAVASRC_DIR)/*.java)
-CLASS_FILES := $(patsubst $(JAVASRC_DIR)/%.java,$(BUILD_DIR)/%.class,$(JAVA_SOURCES))
+JAVASRC := $(wildcard $(JAVASRC_DIR)/*.java)
+MANIFEST := $(JAVASRC_DIR)/manifest.txt
+JAVA_OBJ := $(patsubst $(JAVASRC_DIR)/%.java,$(BUILD_DIR)/%.class,$(JAVASRC))
+JSON_JAR := $(JAVALIB_DIR)/json-20240303.jar
 JAR := $(BUILD_DIR)/servidor.jar
 
 # Targets
@@ -34,17 +36,19 @@ startgame: $(TARGET)
 	./$(TARGET)
 
 # Download external libraries
-java_lib:
+$(JSON_JAR):
 	mkdir -p $(JAVALIB_DIR)
-	curl -L -o $(JAVALIB_DIR)/json-20240303.jar "https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar"
+	curl -L -o $@ "https://repo1.maven.org/maven2/org/json/json/20240303/json-20240303.jar"
 
 # Compile Java files
-$(CLASS_FILES): $(JAVA_SOURCES) java_lib | $(BUILD_DIR)
-	javac -d $(BUILD_DIR) $< -cp $(JAVALIB_DIR)
+$(JAVA_OBJ): $(JAVASRC) $(JSON_JAR) | $(BUILD_DIR)
+	javac -d $(BUILD_DIR) $(JAVASRC) -cp $(JSON_JAR)
 
 # Create JAR file
-$(JAR): $(CLASS_FILES)
-	jar cmf $(JAVASRC_DIR)/manifest.txt $@ -C $(BUILD_DIR) .
+$(JAR): $(JAVA_OBJ) $(MANIFEST)
+	jar cmf $(MANIFEST) $@ -C $(BUILD_DIR) .
+
+server: $(JAR)
 
 startserver: $(JAR)
 	java -jar $(JAR)
@@ -53,4 +57,4 @@ startserver: $(JAR)
 clean:
 	rm -f $(BUILD_DIR)/*
 
-.PHONY: all clean startserver startgame
+.PHONY: all clean server startserver startgame
