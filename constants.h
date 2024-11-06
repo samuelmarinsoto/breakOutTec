@@ -33,9 +33,18 @@ const float default_ball_velocity = 300.0f; //Velocidad inicial de la bola.
 const float default_ballpos_x = 350; //Posicion inicial en 'x' que tiene la bola al spawnear.
 const float default_ballpos_y = 500; //Posicion inicial en 'y' que tiene la bola al spawnear.
 
-//Constante que define el tamaño que tiene la matriz dinamica con los bloques a la hora de crearla.
-
+//Constante que define el tamaño que tiene la lista dinamica con los bloques a la hora de crearla.
 const int ba_size = 64;
+
+//Constante que define el maximo de bolas con las que puede lidiar el juego a la vez.
+const int max_balls = 10;
+
+//Constantes que definen los puntajes de cada color de bloques de manera inicial.
+
+const int default_red = 100; //Puntuacion inicial para los bloques rojos
+const int default_orange = 75; //Puntuacion inicial para los bloques naranjas
+const int default_yellow = 50; //Puntuacion inicial para los bloques amarillos
+const int default_green = 25; //Puntuacion inicial para los bloques verdes
 
 
 
