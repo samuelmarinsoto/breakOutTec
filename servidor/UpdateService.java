@@ -39,7 +39,7 @@ public class UpdateService {
          	       System.out.println("Client disconnected.");
             	} else {
                 	System.out.println("Received from client: " + message);
-                	client.write("Echo: " + message);
+                	pushUpdate(message);
             	}
             }
         } catch (IOException e){
