@@ -13,13 +13,80 @@
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8080
 
-int extra_life_brick_indexes[64];  // Array for storing the brick indexes that give extra life
-int increase_speed_brick_indexes[64];  // Array for storing the brick indexes that increase speed
-int decrease_speed_brick_indexes[64];  // Array for storing the brick indexes that decrease speed
+int extra_life_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de vida extra
+int increase_speed_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de aumentar la velocidad de la bola
+int decrease_speed_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de reducir la velocidad de la bola
+int double_racket_indexes[64]; //Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de duplicar el tamaño de la raqueta
+int half_racket_indexes[64]; //Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de dividir a la mitad el tamaño de la raqueta
+int add_ball_indexes[64]; //Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de aumentar una bola
 
-int extra_life_count = 0;  // Track the number of active "extra life" bricks
-int increase_speed_count = 0;  // Track the number of active "increase speed" bricks
-int decrease_speed_count = 0;
+int extra_life_count = 0;  // Contador de la cantidad de bloques que tienen el poder de extra vida
+int increase_speed_count = 0;  // Contador de la cantidad de bloques que tienen el poder de mas velocidad en la bola
+int decrease_speed_count = 0;  // Contador de la cantidad de bloques que tienen el poder de menos velocidad en la bola
+int double_racket_count = 0; // Contador de la cantidad de bloques que tienen el poder de duplicar el tamaño de la raqueta
+int half_racket_count = 0; // Contador de la cantidad de bloques que tienen el poder de dividir a la mitad el tamaño de la raqueta
+int add_ball_count = 0; // Contador de la cantidad de bloques que tienen el poder de agregar una bola
+
+
+// Funcion que convierte un string con el nombre de un color a un color
+Color GetColorFromName(const char *color_name) {
+    if (strcmp(color_name, "red") == 0) return RED;
+    if (strcmp(color_name, "green") == 0) return GREEN;
+    if (strcmp(color_name, "yellow") == 0) return YELLOW;
+    if (strcmp(color_name, "orange") == 0) return ORANGE;
+}
+
+//------------------Seccion de definicion de estructuras a usar y otros elementos previo al inicio del juego----------------------
+//Estructura que define las dimensiones que deben de tener todos los bloques. Crea el estandar del resto de bloques: Fabrica de bloques.
+typedef struct {
+   Rectangle rect;
+    float w; //Tamaño en 'x' que tiene el bloque a crear
+    float h; //Tamaño en 'y' que tiene el bloque a crear
+} Brick_factory;
+
+//Estructura que define los datos especificos de un bloque, es decir, es la estructura principal de cada bloque.
+typedef struct {
+    Brick_factory base; //Ancla el bloque creado con la base que debe tener cada bloque definido en el factory.
+    Color color; //Define el color que tiene el bloque el cual es definido luego.
+    int score; //Puntaje que da el bloque especifico
+} Brick;
+
+//Estructura que crea la lista dinamica de bloques con las que se almacenan todos los bloques creados y printeados en la pantalla.
+typedef struct {
+    Brick *data; //Define mediante un puntero el bloque especifico que esta almacenado en la casilla revisada. Este se guarda porque se tienen varios bloques que pueden ser distintos.
+    size_t size; //Define el total de blques que aun quedan en la lista de bloques.
+    size_t capacity; //Define el total de bloques que se pueden almacenar en la lista.
+} BrickArray;
+
+
+//Estructura de la bola y sus caracteristicas
+struct Ball {
+    Vector2 pos; //Define la posicion en la que se encuentra la bola actualmente
+    Vector2 accel; //Define la direccion en ambos ejes en la que se dirige la bola.
+    float vel; //Define la velocidad de la bola.
+    float r; //Define el radio que va a tener la bola.
+};
+
+//Estructura con el jugador y sus caracteristicas
+struct Player {
+    Rectangle rect; //Define las dimensiones del rectangulo de la raqueta.
+    float velocity; //Define la velocidad de la raqueta.
+    int score; //Define la puntuacion que tiene el jugador.
+    int lives; //Define las vidas que tiene el jugador.
+    int level; //Define el nivel de dificultad en el que se encuentra el jugador.
+    float w; //Define el tamaño en el eje 'x' que va a tener la raqueta.
+    float h; //Define el tamaño en el eje 'y' que va a tener la raqueta.
+};
+
+//Declaraciones antes de la ejecucion del juego.
+
+Texture2D background_text; //Textura del fondo del juego
+struct Player player; //Declaracion de un jugador
+struct Ball ball; //Declaracion de un jugador
+struct Ball balls[10];  // Declaracion de bolas
+int num_balls = 1;
+BrickArray bricks; //Declaracion de una lista de bloques dinamica
+bool gg = false; //Declaracion de condicion de derrota como booleano
 
 //------------------Seccion de comunicacion mediante JSONs y sockets----------------------
 
@@ -60,6 +127,11 @@ void handle_json_message(const char *json_string) {
     struct json_object *extra_life;
     struct json_object *increase_ball_speed;
     struct json_object *decrease_ball_speed;
+    struct json_object *double_size_racket;
+    struct json_object *half_size_racket;
+    struct json_object *increase_ball;
+    struct json_object *color;
+    struct json_object *score;
 
     parsed_json = json_tokener_parse(json_string);
     if (!parsed_json) {
@@ -71,11 +143,33 @@ void handle_json_message(const char *json_string) {
     json_object_object_get_ex(parsed_json, "extra_life", &extra_life);
     json_object_object_get_ex(parsed_json, "increase_ball_speed", &increase_ball_speed);
     json_object_object_get_ex(parsed_json, "decrease_ball_speed", &decrease_ball_speed);
+    json_object_object_get_ex(parsed_json, "double_racket", &double_size_racket);
+    json_object_object_get_ex(parsed_json, "half_racket", &half_size_racket);
+    json_object_object_get_ex(parsed_json, "add_ball", &increase_ball);
+    json_object_object_get_ex(parsed_json, "color", &color);
+    json_object_object_get_ex(parsed_json, "score", &score);
 
     int index = json_object_get_int(brick_index);
     bool extraLife = json_object_get_boolean(extra_life);
     bool increaseSpeed = json_object_get_boolean(increase_ball_speed);
     bool decreaseSpeed = json_object_get_boolean(decrease_ball_speed);
+    bool doubleRacket = json_object_get_boolean(double_size_racket);
+    bool halfRacket = json_object_get_boolean(half_size_racket);
+    bool addBall = json_object_get_boolean(increase_ball);
+    const char *color_str = json_object_get_string(color);
+    int updated_score = json_object_get_int(score);
+
+    for (int i = 0; i < bricks.size; i++) {
+        Brick *brick = &bricks.data[i];
+
+        // Compare block color with the received color
+        if ((color_str != NULL) && (brick->color.r == GetColorFromName(color_str).r) &&
+            (brick->color.g == GetColorFromName(color_str).g) &&
+            (brick->color.b == GetColorFromName(color_str).b)) {
+            brick->score = updated_score;
+            printf("Se puede cambiar el puntaje del color, nuevo puntaje del bloque: %d\n", updated_score);
+            }
+    }
 
     if (extraLife && extra_life_count < ba_size) {
         extra_life_brick_indexes[extra_life_count++] = index;
@@ -89,69 +183,22 @@ void handle_json_message(const char *json_string) {
         decrease_speed_brick_indexes[decrease_speed_count++] = index;
     }
 
+    if (doubleRacket && double_racket_count < ba_size) {
+        double_racket_indexes[double_racket_count++] = index;
+    }
+
+    if (halfRacket && half_racket_count < ba_size) {
+        half_racket_indexes[half_racket_count++] = index;
+    }
+
+    if (addBall && add_ball_count < ba_size) {
+        add_ball_indexes[add_ball_count++] = index;
+    }
+
     json_object_put(parsed_json);
 }
 
-void RemovePowerUpBrickIndex(int brickIndexes[], int *count, int index) {
-    for (int i = 0; i < *count; i++) {
-        if (brickIndexes[i] == index) {
-            for (int j = i; j < *count - 1; j++) {
-                brickIndexes[j] = brickIndexes[j + 1];
-            }
-            (*count)--;
-            break;
-        }
-    }
-}
 
-//------------------Seccion de definicion de estructuras a usar y otros elementos previo al inicio del juego----------------------
-//Estructura que define las dimensiones que deben de tener todos los bloques. Crea el estandar del resto de bloques: Fabrica de bloques.
-typedef struct {
-   Rectangle rect;
-    float w; //Tamaño en 'x' que tiene el bloque a crear
-    float h; //Tamaño en 'y' que tiene el bloque a crear
-} Brick_factory;
-
-//Estructura que define los datos especificos de un bloque, es decir, es la estructura principal de cada bloque.
-typedef struct {
-    Brick_factory base; //Ancla el bloque creado con la base que debe tener cada bloque definido en el factory.
-    Color color; //Define el color que tiene el bloque el cual es definido luego.
-} Brick;
-
-//Estructura que crea la lista dinamica de bloques con las que se almacenan todos los bloques creados y printeados en la pantalla.
-typedef struct {
-    Brick *data; //Define mediante un puntero el bloque especifico que esta almacenado en la casilla revisada. Este se guarda porque se tienen varios bloques que pueden ser distintos.
-    size_t size; //Define el total de blques que aun quedan en la lista de bloques.
-    size_t capacity; //Define el total de bloques que se pueden almacenar en la lista.
-} BrickArray;
-
-
-//Estructura de la bola y sus caracteristicas
-struct Ball {
-    Vector2 pos; //Define la posicion en la que se encuentra la bola actualmente
-    Vector2 accel; //Define la direccion en ambos ejes en la que se dirige la bola.
-    float vel; //Define la velocidad de la bola.
-    float r; //Define el radio que va a tener la bola.
-};
-
-//Estructura con el jugador y sus caracteristicas
-struct Player {
-    Rectangle rect; //Define las dimensiones del rectangulo de la raqueta.
-    float velocity; //Define la velocidad de la raqueta.
-    int score; //Define la puntuacion que tiene el jugador.
-    int lives; //Define las vidas que tiene el jugador.
-    int level; //Define el nivel de dificultad en el que se encuentra el jugador.
-    float w; //Define el tamaño en el eje 'x' que va a tener la raqueta.
-    float h; //Define el tamaño en el eje 'y' que va a tener la raqueta.
-};
-
-//Declaraciones antes de la ejecucion del juego.
-
-Texture2D background_text; //Textura del fondo del juego
-struct Player player; //Declaracion de un jugador
-struct Ball ball; //Declaracion de una jugador
-BrickArray bricks; //Declaracion de una lista de bloques dinamica
-bool gg = false; //Declaracion de condicion de derrota como booleano
 
 
 
@@ -171,12 +218,16 @@ void Spawn_bricks(BrickArray *brick_array) {
 
             if (j < 2) { //Asigna el color rojo a las primeras 2 filas de la matriz
                 new_brick.color = RED;
+                new_brick.score = default_red;
             } else if (j < 4) { //Asigna el color naranja a las filas 3 y 4 de la matriz
                 new_brick.color = ORANGE;
+                new_brick.score = default_orange;
             } else if (j < 6) { //Asigna el color amarillo a las filas 5 y 6 de la matriz
                 new_brick.color = YELLOW;
+                new_brick.score = default_yellow;
             } else { //Asigna el color verde a las ultimas 2 filas de la matriz
                 new_brick.color = GREEN;
+                new_brick.score = default_green;
             }
 
 
@@ -203,10 +254,11 @@ void Game_startup(BrickArray *brick_array) {
     player.level = default_level; //Carga el nivel inicial al que se encuentra el jugador
 
     //Codigo que carga a memoria los datos base que debe tener la bola justo antes de que se inicie la partida.
-    ball.accel = (Vector2) {default_accel_x, default_accel_y}; //Carga la direccion a la que se dirige la bola inicialmente.
-    ball.r = default_r; //Carga el radio que tiene la bola
-    ball.pos = (Vector2) {default_ballpos_x, default_ballpos_y}; //Carga la posicion inicial de la bola.
-    ball.vel = default_ball_velocity; //Carga la velocidad inicial de la bola.
+    num_balls = 1;  // Set the initial number of balls
+    balls[0].pos = (Vector2) {default_ballpos_x, default_ballpos_y}; // Initial position
+    balls[0].accel = (Vector2) {default_accel_x, default_accel_y}; // Initial direction
+    balls[0].vel = default_ball_velocity; // Initial velocity
+    balls[0].r = default_r;
 
     //Codigo que carga la lista de bloques
     brick_array->size = 0; //Define en 0 la cantidad de bloques iniciales
@@ -235,60 +287,92 @@ void Game_update() {
     }
 
     //Actualizacion de la posicion de la bola constante en 'x' y en 'y'
-    ball.pos.x = ball.pos.x + ((ball.vel * ball.accel.x) * framet);
-    ball.pos.y = ball.pos.y + ((ball.vel * ball.accel.y) * framet);
+    for (int b = 0; b < num_balls; b++) {
+        balls[b].pos.x += balls[b].vel * balls[b].accel.x * framet;
+        balls[b].pos.y += balls[b].vel * balls[b].accel.y * framet;
+    }
 
     //------------------Seccion de colisiones y otras interacciones del juego----------------------
 
     //Colision entre la bola y los bloques.
     for (int i = 0; i < bricks.size; i++) {
         Brick *brick = &bricks.data[i];
-        if (CheckCollisionCircleRec( //Va chequeando si se detecta una colision con un bloque.
-            ball.pos,
-            ball.r,
-            brick->base.rect
-        )) {
-            ball.accel.y = ball.accel.y * -1; //Cambia la direccion de la bola
-            player.score = player.score + 10; // Actualiza el puntaje del juego
+        for (int b = 0; b < num_balls; b++) {
+            if (CheckCollisionCircleRec( //Va chequeando si se detecta una colision con un bloque.
+                balls[b].pos,
+                balls[b].r,
+                brick->base.rect
+            )) {
+                balls[b].accel.y *= -1; //Cambia la direccion de la bola
+                player.score += brick->score; // Actualiza el puntaje del juego
 
-            //Manejo de poderes enviados por el server:
+                //Manejo de poderes enviados por el server:
 
-            for (int j = 0; j < extra_life_count; j++) {
-                if (i == extra_life_brick_indexes[j]) {
-                    player.lives += 1;
-                    printf("Se ha obtenido una vida extra. Vidas: %d\n", player.lives);
-                    RemovePowerUpBrickIndex(extra_life_brick_indexes, &extra_life_count, i);
-                    break; //
+                for (int j = 0; j < extra_life_count; j++) {
+                    if (i == extra_life_brick_indexes[j]) {
+                        player.lives += 1;
+                        printf("Se ha obtenido una vida extra. Vidas: %d\n", player.lives);
+                        break; //
+                    }
                 }
-            }
 
-            // Check for increase speed power-ups
-            for (int j = 0; j < increase_speed_count; j++) {
-                if (i == increase_speed_brick_indexes[j]) {
-                    ball.vel *= 1.1f;  // Increase speed by 10%
-                    printf("La velocidad de la bola ha subido. Velocidad actual: %.2f\n", ball.vel);
-                    RemovePowerUpBrickIndex(increase_speed_brick_indexes, &increase_speed_count, i);
-                    break;
+                // Check for increase speed power-ups
+                for (int j = 0; j < increase_speed_count; j++) {
+                    if (i == increase_speed_brick_indexes[j]) {
+                        ball.vel *= 1.1f;  // Increase speed by 10%
+                        printf("La velocidad de la bola ha subido. Velocidad actual: %.2f\n", ball.vel);
+                        break;
+                    }
                 }
-            }
 
-            // Check for decrease speed power-ups
-            for (int j = 0; j < decrease_speed_count; j++) {
-                if (i == decrease_speed_brick_indexes[j]) {
-                    ball.vel *= 0.9f;
-                    printf("La velocidad de la bola ha bajado. Velocidad actual: %.2f\n", ball.vel);
-                    RemovePowerUpBrickIndex(decrease_speed_brick_indexes, &decrease_speed_count, i);
-                    break;
+                // Check for decrease speed power-ups
+                for (int j = 0; j < decrease_speed_count; j++) {
+                    if (i == decrease_speed_brick_indexes[j]) {
+                        ball.vel *= 0.9f;
+                        printf("La velocidad de la bola ha bajado. Velocidad actual: %.2f\n", ball.vel);
+                        break;
+                    }
                 }
-            }
 
-            for (int j = i; j < bricks.size - 1; j++) { //Se elimina el bloque de la lista.
-                bricks.data[j] = bricks.data[j + 1];
-            }
+                for (int j = 0; j < double_racket_count; j++) {
+                    if (i == double_racket_indexes[j]) {
+                        player.rect.width *= 2;
+                        printf("Se duplico el tamaño de la raqueta. Nuevo ancho: %.2f\n", player.rect.width);
+                        break;
+                    }
+                }
 
-            bricks.size--;
-            i--;
-            break;
+                for (int j = 0; j < half_racket_count; j++) {
+                    if (i == half_racket_indexes[j]) {
+                        player.rect.width *= 0.5f;
+                        printf("Se dividio a la mitad el tamaño de la raqueta. Nuevo ancho: %.2f\n", player.rect.width);
+                        break;
+                    }
+                }
+
+                for (int j = 0; j < add_ball_count; j++) {
+                    if (i == add_ball_indexes[j]) {
+
+                        if (num_balls < max_balls) {
+                            balls[num_balls].pos = (Vector2) {ball.pos.x, ball.pos.y}; // Start new ball at same position
+                            balls[num_balls].accel = (Vector2) {default_accel_x, default_accel_y}; // Set the direction
+                            balls[num_balls].vel = ball.vel; // Set the same speed as the original ball
+                            balls[num_balls].r = ball.r; // Same radius
+                            num_balls++; // Increment the ball count
+                            printf("Se ha añadido una nueva bola.\n");
+                        }
+                        break;
+                    }
+                }
+
+                for (int j = i; j < bricks.size - 1; j++) { //Se elimina el bloque de la lista.
+                    bricks.data[j] = bricks.data[j + 1];
+                }
+
+                bricks.size--;
+                i--;
+                break;
+            }
         }
     }
 
@@ -302,31 +386,34 @@ void Game_update() {
     }
 
     //Colision entre la bola y las paredes, se invierte la aceleracion pues el choque causa cambio a direccion contraria.
-    if (ball.pos.x > screen_w || ball.pos.x < 10) {
-        ball.accel.x = ball.accel.x * -1; //Cambia el eje 'x' al que va la bola al contrario
-    }
-    if (ball.pos.y < 10) {
-        ball.accel.y = ball.accel.y * -1; //Cambia el eje 'y' al que va la bola al contrario
-    }
+    for (int b = 0; b < num_balls; b++) {
+        if (balls[b].pos.x > screen_w || balls[b].pos.x < 10) {
+            balls[b].accel.x *= -1; // Se invierte la direccion en el eje 'x'
+        }
+        if (balls[b].pos.y < 10) {
+            balls[b].accel.y *= -1; // Se invierte la direccion en el eje 'y'
+        }
 
     //Chequeo de si la bola se va de la pantalla abajo para posteriormente volver a jugar pero con una vida menos.
-    if (ball.pos.y > screen_h) {
-        player.lives--; //Quita una vida
-        ball.pos = (Vector2){default_ballpos_x, default_ballpos_y}; //Se vuelve a la posicion de la bola original
-        ball.accel = (Vector2){default_accel_x, default_accel_y}; //Se vuelve a la aceleracion de la bola original
-        if (player.lives <= 0) {
-            gg = true; //Se activa la condicion para acabar con la partida.
+        if (balls[b].pos.y > screen_h) {
+            player.lives--; // Pierde una vida el jugador
+            balls[b].pos = (Vector2) {default_ballpos_x, default_ballpos_y}; // Reinicia la posicion de la bola
+            balls[b].accel = (Vector2) {default_accel_x, default_accel_y}; // Reinicia la aceleracion de la bola
+            if (player.lives <= 0) {
+                gg = true; // Condicion de si se termina el juego, todas las vidas se perdieron
+            }
         }
-        return;
     }
 
 
     //Colision entre la bola y el jugador.
-    if (CheckCollisionCircleRec(ball.pos, ball.r, player.rect)) {
+    for (int b = 0; b < num_balls; b++) {
         //Se genera un numero aleatorio y se le saca modulo 2.
         //Esto causa un escenario 50/50 para decidir la direccion de la bola una vez golpea la raqueta aleatoriamente.
-        ball.accel.x = (rand() % 2 == 0 ? 1 : -1) * ball.accel.x;
-        ball.accel.y = ball.accel.y * -1;
+        if (CheckCollisionCircleRec(balls[b].pos, balls[b].r, player.rect)) {
+            balls[b].accel.x = (rand() % 2 == 0 ? 1 : -1) * balls[b].accel.x;
+            balls[b].accel.y *= -1;
+        }
     }
 
     //Colision entre el jugador y las paredes
@@ -336,8 +423,6 @@ void Game_update() {
     if (player.rect.x > (screen_w - player.rect.width)) { //Chequeo por si choca con la parte derecha de la pantalla.
         player.rect.x = (screen_w - player.rect.width);
     }
-
-
 }
 
 //------------------Seccion de renderizacion----------------------
@@ -364,7 +449,9 @@ void Game_render() {
     }
 
     //Codigo que renderiza a la bola
-    DrawCircle(ball.pos.x, ball.pos.y, ball.r, RAYWHITE);
+    for (int b = 0; b < num_balls; b++) {
+        DrawCircle(balls[b].pos.x, balls[b].pos.y, balls[b].r, RAYWHITE);
+    }
 
     //Codigo que renderiza al jugador
     DrawRectangle(player.rect.x, player.rect.y, player.rect.width, player.rect.height, WHITE);
