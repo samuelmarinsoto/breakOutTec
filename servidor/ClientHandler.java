@@ -6,7 +6,7 @@ import java.util.List;
 import org.json.JSONObject;
 
 public class ClientHandler {
-	private final SocketChannel clientChannel; // channel es un socket
+	private final SocketChannel clientChannel; // channel es el tunel que abre el socket (no se)
 
 	public ClientHandler(SocketChannel clientChannel){
 		this.clientChannel = clientChannel;

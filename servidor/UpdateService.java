@@ -11,8 +11,8 @@ public class UpdateService {
         clients = new HashMap<>();
     }
 
-    public void acceptConnection(SelectionKey key, Selector selector) throws IOException {
-        ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
+    public void acceptConnection(SelectionKey socket, Selector selector) throws IOException {
+        ServerSocketChannel serverChannel = (ServerSocketChannel) socket.channel();
         SocketChannel clientChannel = serverChannel.accept();
         clientChannel.configureBlocking(false);
         clientChannel.register(selector, SelectionKey.OP_READ);
@@ -22,24 +22,24 @@ public class UpdateService {
         System.out.println("New client connected: " + clientChannel.getRemoteAddress());
     }
 
-    public void processUpdate(SelectionKey key) throws IOException {
-        SocketChannel clientChannel = (SocketChannel) key.channel();
+    public void processUpdate(SelectionKey socket) throws IOException {
+        SocketChannel clientChannel = (SocketChannel) socket.channel();
         ClientHandler client = clients.get(clientChannel);
 
-        if (clientHandler != null) {
-            String message = clientHandler.read();
+        if (client != null) {
+            String message = client.read();
             if (message == null) {
                 clientChannel.close();
                 clients.remove(clientChannel);
                 System.out.println("Client disconnected.");
             } else {
                 System.out.println("Received from client: " + message);
-                clientHandler.write("Echo: " + message);
+                client.write("Echo: " + message);
             }
         }
     }
 
-    public void updateAllClients(String update) {
+    public void pushUpdate(String update) {
         clients.values().forEach(client -> client.write(update));
     }
 }

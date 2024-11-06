@@ -25,16 +25,16 @@ public class Server {
     public void start() throws IOException {
         while (true) {
             selector.select(); // Block until events are available
-            Iterator<SelectionKey> keyIterator = selector.selectedKeys().iterator();
+            Iterator<SelectionKey> activeSockets = selector.selectedKeys().iterator();
 
-            while (keyIterator.hasNext()) {
-                SelectionKey key = keyIterator.next();
-                keyIterator.remove();
+            while (activeSockets.hasNext()) {
+                SelectionKey socket = activeSockets.next();
+                activeSockets.remove();
 
-                if (key.isAcceptable()) {
-                    updateService.acceptConnection(key, selector); // Delegate to UpdateService
-                } else if (key.isReadable()) {
-                    updateService.processUpdate(key); // Delegate to UpdateService
+                if (socket.isAcceptable()) {
+                    updateService.acceptConnection(socket, selector); // Delegate to UpdateService
+                } else if (socket.isReadable()) {
+                    updateService.processUpdate(socket); // Delegate to UpdateService
                 }
             }
         }
