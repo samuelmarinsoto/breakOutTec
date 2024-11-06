@@ -29,8 +29,9 @@ $(BUILD_DIR):
 $(TARGET): $(C_SRC) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(C_SRC) -o $(TARGET) $(LDFLAGS)
 
-testclient: $(BUILD_DIR)
-	$(CC) $(CFLAGS) client.c -o build/client $(LDFLAGS)
+testclients: $(BUILD_DIR)
+	$(CC) $(CFLAGS) testgameclient.c -o build/testgameclient $(LDFLAGS)
+	$(CC) $(CFLAGS) testspectatorclient.c -o build/testspectatorclient $(LDFLAGS)
 
 startgame: $(TARGET)
 	./$(TARGET)
