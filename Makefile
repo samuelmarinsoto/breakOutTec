@@ -13,6 +13,7 @@ JAVASRC := $(wildcard $(JAVASRC_DIR)/*.java)
 MANIFEST := $(JAVASRC_DIR)/manifest.txt
 JAVA_OBJ := $(patsubst $(JAVASRC_DIR)/%.java,$(BUILD_DIR)/%.class,$(JAVASRC))
 JSON_JAR := $(JAVALIB_DIR)/json-20240303.jar
+FATJAR_DIR := $(BUILD_DIR)/fatjar
 JAR := $(BUILD_DIR)/servidor.jar
 
 # Targets
@@ -47,9 +48,13 @@ $(JSON_JAR):
 $(JAVA_OBJ): $(JAVASRC) $(JSON_JAR) | $(BUILD_DIR)
 	javac -d $(BUILD_DIR) $(JAVASRC) -cp $(JSON_JAR)
 
+$(FATJAR_DIR): $(JSON_JAR) | $(BUILD_DIR)
+	mkdir -p $@
+	cd $@ && jar xf ../../$(JSON_JAR)
+
 # Create JAR file
-$(JAR): $(JAVA_OBJ) $(MANIFEST)
-	jar cmf $(MANIFEST) $@ -C $(BUILD_DIR) .
+$(JAR): $(JAVA_OBJ) $(MANIFEST) $(FATJAR_DIR)
+	jar cmf $(MANIFEST) $@ -C $(BUILD_DIR) . -C $(FATJAR_DIR) .
 
 server: $(JAR)
 
@@ -58,6 +63,6 @@ startserver: $(JAR)
 	
 # Clean build directory
 clean:
-	rm -f $(BUILD_DIR)/*
+	rm -rf $(BUILD_DIR)/*
 
 .PHONY: all clean server juego startserver startgame
