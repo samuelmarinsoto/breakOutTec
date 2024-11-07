@@ -1,6 +1,9 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define PORT 12345
+#define SERVER_IP "127.0.0.1"
+
 //Constantes que tienen las dimensiones de la pantalla.
 const int screen_w = 500; //El ancho de la pantalla de juego
 const int screen_h = 600; //La altura de la pantalla de juego
@@ -45,7 +48,5 @@ const int default_red = 100; //Puntuacion inicial para los bloques rojos
 const int default_orange = 75; //Puntuacion inicial para los bloques naranjas
 const int default_yellow = 50; //Puntuacion inicial para los bloques amarillos
 const int default_green = 25; //Puntuacion inicial para los bloques verdes
-
-
 
 #endif //CONSTANTS_H

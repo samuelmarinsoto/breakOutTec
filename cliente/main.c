@@ -11,11 +11,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-
-//Definicion de ip local y puerto de conexion del juego
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 8080
-
 int extra_life_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de vida extra
 int increase_speed_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de aumentar la velocidad de la bola
 int decrease_speed_brick_indexes[64];  // Lista que almacena los diferentes bloques en la lista de bloques que tienen el poder de reducir la velocidad de la bola
@@ -93,38 +88,36 @@ bool gg = false; //Declaracion de condicion de derrota como booleano
 
 //------------------Seccion de comunicacion mediante JSONs y sockets----------------------
 
-int create_socket() {
-    int sock = socket(AF_INET, SOCK_STREAM, 0); //Crea el socket para la recepcion de mensajes
-    if (sock < 0) { //Chequeo de si se creo el socket correctamente
-        perror("Socket fallo en crearse");
-        exit(EXIT_FAILURE);
-    }
-    int flags = fcntl(sock, F_GETFL, 0);
-    if (flags < 0) {
-        perror("fcntl F_GETFL failed");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
+int serverconnect() {
+    int sock = 0;
+	struct sockaddr_in server_address;
 
-    if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-        perror("fcntl F_SETFL failed");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
-    return sock; //Da el socket creado
-}
+	// Creating socket
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		perror("Socket creation error");
+		return -1;
+	}
 
-void connect_to_server(int sock) {
-    struct sockaddr_in server_address;
-    memset(&server_address, 0, sizeof(server_address));
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(SERVER_PORT);
-    server_address.sin_addr.s_addr = inet_addr(SERVER_IP);
+	// Setting up server address struct
+	server_address.sin_family = AF_INET;
+	server_address.sin_port = htons(PORT);
 
-    if (connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-        perror("La conexion con el server ha fallado");
-        exit(EXIT_FAILURE);
-    }
+	// Convert IPv4 and IPv6 addresses from text to binary form
+	if (inet_pton(AF_INET, SERVER_IP, &server_address.sin_addr) <= 0) {
+		perror("Invalid address/ Address not supported");
+		close(sock);
+		return -1;
+	}
+
+	// Connect to server
+	if (connect(sock, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+		perror("Connection failed");
+		close(sock);
+		return -1;
+	}
+
+	return sock;
 }
 
 void receive_json(int sock, char *buffer, size_t buffer_size) {
@@ -533,8 +526,7 @@ void Game_shutdown() { //Se libera toda la data almacenada sobre los bloques en 
 
 int main(void) {
 
-    int sock = create_socket();
-    connect_to_server(sock);
+    int sock = serverconnect();
 
     InitWindow(screen_w, screen_h, "breakOutTec"); //Se carga la pantalla del juego
 
