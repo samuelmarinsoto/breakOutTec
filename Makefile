@@ -1,7 +1,7 @@
 # C Compiler settings
 CC = clang
 CFLAGS = -Wall -Wextra -O0 -g
-LDFLAGS = -lraylib -lm -ldl -lpthread -lGL -lX11
+LDFLAGS = -ljson-c -lraylib -lm -ldl -lpthread -lGL -lX11 -I./cliente/
 
 # Java settings
 CSRC_DIR := cliente
@@ -28,6 +28,8 @@ $(BUILD_DIR):
 # Compile C program
 $(TARGET): $(C_SRC) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(C_SRC) -o $(TARGET) $(LDFLAGS)
+
+juego: $(TARGET)
 
 testclients: $(BUILD_DIR)
 	$(CC) $(CFLAGS) testgameclient.c -o build/testgameclient $(LDFLAGS)
@@ -58,4 +60,4 @@ startserver: $(JAR)
 clean:
 	rm -f $(BUILD_DIR)/*
 
-.PHONY: all clean server startserver startgame
+.PHONY: all clean server juego startserver startgame
