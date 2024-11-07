@@ -16,7 +16,7 @@ link_directories(${RAYLIB_DIR}/lib)
 link_directories(${JSON_C_DIR}/lib)
 
 # Add the executable
-add_executable(untitled1 main.c constants.h)
+add_executable(untitled1 cliente/main.c cliente/constants.h)
 
 # Link the necessary libraries
 target_link_libraries(untitled1 raylib m pthread dl json-c)
