@@ -8,6 +8,9 @@
 #include <arpa/inet.h>
 #include <json-c/json.h>
 #include "constants.h"
+#include <fcntl.h>
+#include <errno.h>
+
 
 //Definicion de ip local y puerto de conexion del juego
 #define SERVER_IP "127.0.0.1"
@@ -96,6 +99,18 @@ int create_socket() {
         perror("Socket fallo en crearse");
         exit(EXIT_FAILURE);
     }
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags < 0) {
+        perror("fcntl F_GETFL failed");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
+
+    if (fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+        perror("fcntl F_SETFL failed");
+        close(sock);
+        exit(EXIT_FAILURE);
+    }
     return sock; //Da el socket creado
 }
 
@@ -114,11 +129,20 @@ void connect_to_server(int sock) {
 
 void receive_json(int sock, char *buffer, size_t buffer_size) {
     int bytes_received = recv(sock, buffer, buffer_size - 1, 0);
-    if (bytes_received < 0) {
-        perror("No se recibieron los datos correctamente");
+
+    // If no data is received yet (or socket is not ready), return without blocking
+    if (bytes_received == 0) {
+        printf("Connection closed by server\n");
         exit(EXIT_FAILURE);
+    } else if (bytes_received < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            perror("Error receiving data");
+            exit(EXIT_FAILURE);
+        }
+        return;
     }
-    buffer[bytes_received] = '\0';
+
+    buffer[bytes_received] = '\0'; // Null-terminate the received string
 }
 
 void handle_json_message(const char *json_string) {
@@ -270,13 +294,21 @@ void Game_startup(BrickArray *brick_array) {
 }
 
 //------------------Seccion de elementos chequeados a cada rato en el juego----------------------
-void Game_update() {
+void Game_update(int sock) {
 
     float framet = GetFrameTime(); //Obtener el frametime del juego
 
 
     //Verifica fin de la partida
     if (gg) return;
+
+    char buffer[1024]; // Buffer para recibir el JSON
+    receive_json(sock, buffer, sizeof(buffer));  // Recibe datos sin bloquear
+
+    // Si hay datos, procesarlos
+    if (buffer[0] != '\0') {
+        handle_json_message(buffer);  // Procesa los datos del servidor (activa poderes)
+    }
 
     //Control del jugador sobre la barra de juego.
     if(IsKeyDown(KEY_LEFT)) {
@@ -501,6 +533,9 @@ void Game_shutdown() { //Se libera toda la data almacenada sobre los bloques en 
 
 int main(void) {
 
+    int sock = create_socket();
+    connect_to_server(sock);
+
     InitWindow(screen_w, screen_h, "breakOutTec"); //Se carga la pantalla del juego
 
     SetTargetFPS(60); //Se setean los FPS
@@ -511,7 +546,7 @@ int main(void) {
 
     while (!WindowShouldClose()) {
 
-        Game_update(); //Se chequea las condiciones que se pueden actualizar del juego
+        Game_update(sock); //Se chequea las condiciones que se pueden actualizar del juego
 
         BeginDrawing(); //Se dibuja la pantalla
         ClearBackground(BLUE);
