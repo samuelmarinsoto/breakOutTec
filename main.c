@@ -294,13 +294,21 @@ void Game_startup(BrickArray *brick_array) {
 }
 
 //------------------Seccion de elementos chequeados a cada rato en el juego----------------------
-void Game_update() {
+void Game_update(int sock) {
 
     float framet = GetFrameTime(); //Obtener el frametime del juego
 
 
     //Verifica fin de la partida
     if (gg) return;
+
+    char buffer[1024]; // Buffer para recibir el JSON
+    receive_json(sock, buffer, sizeof(buffer));  // Recibe datos sin bloquear
+
+    // Si hay datos, procesarlos
+    if (buffer[0] != '\0') {
+        handle_json_message(buffer);  // Procesa los datos del servidor (activa poderes)
+    }
 
     //Control del jugador sobre la barra de juego.
     if(IsKeyDown(KEY_LEFT)) {
@@ -538,7 +546,7 @@ int main(void) {
 
     while (!WindowShouldClose()) {
 
-        Game_update(); //Se chequea las condiciones que se pueden actualizar del juego
+        Game_update(sock); //Se chequea las condiciones que se pueden actualizar del juego
 
         BeginDrawing(); //Se dibuja la pantalla
         ClearBackground(BLUE);
