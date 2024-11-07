@@ -2,6 +2,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.Iterator;
+import java.util.Scanner;
+import org.json.JSONObject;
 
 public class Server {
 
@@ -24,6 +26,50 @@ public class Server {
         updateService = new UpdateService();
 
         System.out.println("Server started. Listening on port " + port);
+
+        // start console
+        new Thread(this::console).start();
+    }
+
+    private void console(){
+    	Scanner scanner = new Scanner(System.in);
+    	while (true){
+    		System.out.println("Enter game update:\n"
+    		+ "(format: brick_index extra_life increase_ball_speed decrease_ball_speed"
+    		+ " double_racket half_racket add_ball color score)\n"
+    		+ "(example: 3 true false true false true false red 1500)\n");
+    		String input = scanner.nextLine();
+    		JSONObject command = parsecmd(input);
+
+    		if (command != null){
+    			updateService.pushUpdate(command.toString());
+    		} else {
+    			System.out.println("Invalid input format. Please try again");
+    		}
+    	}
+    }
+
+    private JSONObject parsecmd(String input){
+    	try {
+    		String[] parts = input.split(" ");
+    		if (parts.length != 9) return null; // not enough arguments
+
+    		JSONObject command = new JSONObject();
+    		json.put("brick_index", Integer.parseInt(parts[0]));
+    		json.put("extra_life", Boolean.parseBoolean(parts[1]));
+    		json.put("increase_ball_speed", Boolean.parseBoolean(parts[2]));
+    		json.put("decrease_ball_speed", Boolean.parseBoolean(parts[3]));
+    		json.put("double_racket", Boolean.parseBoolean(parts[4]));
+    		json.put("half_racket", Boolean.parseBoolean(parts[5]));
+    		json.put("add_ball", Boolean.parseBoolean(parts[6]));
+    		json.put("color", parts[7]);
+    		json.put("score", Integer.parseInt(parts[8]));
+
+    		return command;
+    	} catch (IOException e){
+    		System.err.println("Error parsing input (parsecmd in Server.java): " + e.getMessage());
+    		return null;
+    	}
     }
 
     public void start(){
