@@ -171,7 +171,7 @@ char* get_update(int sock) {
     return json_data;
 }
 
-void handle_json_message(const char *json_string) {
+void process_update(const char *json_string) {
     struct json_object *parsed_json;
     struct json_object *brick_index;
     struct json_object *action;
@@ -209,7 +209,7 @@ void handle_json_message(const char *json_string) {
 
     int index = json_object_get_int(brick_index);
     bool extraLife = json_object_get_boolean(extra_life);
-    const char *action = json_object_get_boolean(action);
+    const char *action1 = json_object_get_string(action);
     bool increaseSpeed = json_object_get_boolean(increase_ball_speed);
     bool decreaseSpeed = json_object_get_boolean(decrease_ball_speed);
     bool doubleRacket = json_object_get_boolean(double_size_racket);
@@ -346,16 +346,18 @@ void Game_update(int sock) {
 
     // Si hay datos, procesarlos
     if (message) {
-        handle_json_message(message);  // Procesa los datos del servidor (activa poderes)
+        process_update(message);  // Procesa los datos del servidor (activa poderes)
         free(message); // se hace malloc para retornar el message, liberar
     }
 
     //Control del jugador sobre la barra de juego.
     if(IsKeyDown(KEY_LEFT)) {
         player.rect.x -= player.velocity * framet; //Control con la direccional izquierda para moverse a la izquierda.
+        playerpos -= player.velocity * framet; //Control con la direccional izquierda para moverse a la izquierda.
     }
     if(IsKeyDown(KEY_RIGHT)) {
         player.rect.x += player.velocity * framet; //Control con la direccional derecha para moverse a la derecha.
+        playerpos += player.velocity * framet; //Control con la direccional derecha para moverse a la derecha.
     }
 
     //Actualizacion de la posicion de la bola constante en 'x' y en 'y'
@@ -366,6 +368,7 @@ void Game_update(int sock) {
 
     //------------------Seccion de colisiones y otras interacciones del juego----------------------
 
+	int hubo_colision = 0;
     //Colision entre la bola y los bloques.
     for (int i = 0; i < bricks.size; i++) {
         Brick *brick = &bricks.data[i];
