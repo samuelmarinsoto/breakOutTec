@@ -31,7 +31,7 @@ const float default_accel_x = 1.0f; //Direccion inicial en donde se mueve la bol
 const float default_accel_y = -1.0f; //Direccion inicial en donde se mueve la bola en el eje "y"
 
 const float default_r = 5.0f; //Radio inicial de la bola que define tambien su tamaño inicial.
-const float default_ball_velocity = 300.0f; //Velocidad inicial de la bola.
+const float default_ball_velocity = 10.0f; //Velocidad inicial de la bola.
 
 const float default_ballpos_x = 350; //Posicion inicial en 'x' que tiene la bola al spawnear.
 const float default_ballpos_y = 500; //Posicion inicial en 'y' que tiene la bola al spawnear.

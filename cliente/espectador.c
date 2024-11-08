@@ -237,6 +237,7 @@ void handle_json_message(const char *json_string) {
 
     if (extraLife && extra_life_count < ba_size) {
         extra_life_brick_indexes[extra_life_count++] = index;
+        printf("%d index de extra vida", index);
     }
 
     if (increaseSpeed && increase_speed_count < ba_size) {

@@ -194,8 +194,8 @@ void process_update(const char *json_string) {
     }
 
     json_object_object_get_ex(parsed_json, "brick_index", &brick_index);
-    json_object_object_get_ex(parsed_json, "extra_life", &extra_life);
     json_object_object_get_ex(parsed_json, "action", &action);
+    json_object_object_get_ex(parsed_json, "extra_life", &extra_life);
     json_object_object_get_ex(parsed_json, "increase_ball_speed", &increase_ball_speed);
     json_object_object_get_ex(parsed_json, "decrease_ball_speed", &decrease_ball_speed);
     json_object_object_get_ex(parsed_json, "double_racket", &double_size_racket);

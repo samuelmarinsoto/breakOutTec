@@ -35,14 +35,15 @@ public class Server {
     	Scanner scanner = new Scanner(System.in);
     	while (true){
     		System.out.println("Enter game update:\n"
-    		+ "(format: brick_index extra_life increase_ball_speed decrease_ball_speed"
-    		+ " double_racket half_racket add_ball color score)\n"
+    		+ "(format: brick_index action extra_life increase_ball_speed decrease_ball_speed"
+    		+ " double_racket half_racket add_ball color score player_position ball_position_x ball_position_y)\n"
     		+ "(example: 3 create true false true false true false red 1500 50 50 50)\n");
     		String input = scanner.nextLine();
     		JSONObject json = parsecmd(input);
 
     		if (json != null){
     			updateService.pushUpdate(json.toString());
+    			System.out.println("sent: " + json.toString());
     		} else {
     			System.out.println("Invalid input format. Please try again");
     		}
