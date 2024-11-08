@@ -16,10 +16,6 @@ JSON_JAR := $(JAVALIB_DIR)/json-20240303.jar
 FATJAR_DIR := $(BUILD_DIR)/fatjar
 JAR := $(BUILD_DIR)/servidor.jar
 
-# Targets
-TARGET = $(BUILD_DIR)/juego
-C_SRC = $(CSRC_DIR)/main.c
-
 # Default target
 all: $(TARGET) $(JAR)
 
@@ -27,10 +23,15 @@ $(BUILD_DIR):
 	mkdir -p $@
 	
 # Compile C program
-$(TARGET): $(C_SRC) | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(C_SRC) -o $(TARGET) $(LDFLAGS)
+juego: $(CSRC_DIR)/main.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $(BUILD_DIR)/juego $(LDFLAGS)
+
+espectador: $(CSRC_DIR)/espectador.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $< -o $(BUILD_DIR)/espectador $(LDFLAGS)
 
 juego: $(TARGET)
+
+espectador: 
 
 testclients: $(BUILD_DIR)
 	$(CC) $(CFLAGS) testgameclient.c -o build/testgameclient $(LDFLAGS)
