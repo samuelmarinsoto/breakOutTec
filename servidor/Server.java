@@ -37,7 +37,7 @@ public class Server {
     		System.out.println("Enter game update:\n"
     		+ "(format: brick_index extra_life increase_ball_speed decrease_ball_speed"
     		+ " double_racket half_racket add_ball color score)\n"
-    		+ "(example: 3 true false true false true false red 1500)\n");
+    		+ "(example: 3 create true false true false true false red 1500 50 50 50)\n");
     		String input = scanner.nextLine();
     		JSONObject json = parsecmd(input);
 
@@ -51,18 +51,23 @@ public class Server {
 
     private JSONObject parsecmd(String input){
     	String[] parts = input.split(" ");
-    	if (parts.length != 9) return null; // not enough arguments
+    	if (parts.length != 13) return null; // not enough arguments
 
     	JSONObject json = new JSONObject();
-    	json.put("brick_index", Integer.parseInt(parts[0]));
-    	json.put("extra_life", Boolean.parseBoolean(parts[1]));
-    	json.put("increase_ball_speed", Boolean.parseBoolean(parts[2]));
-    	json.put("decrease_ball_speed", Boolean.parseBoolean(parts[3]));
-    	json.put("double_racket", Boolean.parseBoolean(parts[4]));
-    	json.put("half_racket", Boolean.parseBoolean(parts[5]));
-    	json.put("add_ball", Boolean.parseBoolean(parts[6]));
-    	json.put("color", parts[7]);
-    	json.put("score", Integer.parseInt(parts[8]));
+
+        json.put("brick_index", Integer.parseInt(parts[0]));
+        json.put("action", parts[1]); // "create" or "destroy" as a string
+        json.put("extra_life", Boolean.parseBoolean(parts[2]));
+        json.put("increase_ball_speed", Boolean.parseBoolean(parts[3]));
+        json.put("decrease_ball_speed", Boolean.parseBoolean(parts[4]));
+        json.put("double_racket", Boolean.parseBoolean(parts[5]));
+        json.put("half_racket", Boolean.parseBoolean(parts[6]));
+        json.put("add_ball", Boolean.parseBoolean(parts[7]));
+        json.put("color", parts[8]);
+        json.put("score", Integer.parseInt(parts[9]));
+        json.put("player_position", Integer.parseInt(parts[10])); // New player position
+        json.put("ball_position_x", Integer.parseInt(parts[11])); // New ball position x
+        json.put("ball_position_y", Integer.parseInt(parts[12])); // New ball posi
 
     	return json;
     }

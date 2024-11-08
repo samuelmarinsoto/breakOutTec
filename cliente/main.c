@@ -25,6 +25,11 @@ int double_racket_count = 0; // Contador de la cantidad de bloques que tienen el
 int half_racket_count = 0; // Contador de la cantidad de bloques que tienen el poder de dividir a la mitad el tamaño de la raqueta
 int add_ball_count = 0; // Contador de la cantidad de bloques que tienen el poder de agregar una bola
 
+// posiciones
+int bally = 0;
+int ballx = 0;
+int playerpos = 0;
+
 
 // Funcion que convierte un string con el nombre de un color a un color
 Color GetColorFromName(const char *color_name) {
@@ -90,7 +95,7 @@ bool gg = false; //Declaracion de condicion de derrota como booleano
 
 int serverconnect() {
     int sock = 0;
-	struct sockaddr_in server_address;
+	struct sockaddr_in server_address;	
 
 	// Creating socket
 	sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -120,27 +125,56 @@ int serverconnect() {
 	return sock;
 }
 
-void receive_json(int sock, char *buffer, size_t buffer_size) {
-    int bytes_received = recv(sock, buffer, buffer_size - 1, 0);
-
-    // If no data is received yet (or socket is not ready), return without blocking
-    if (bytes_received == 0) {
-        printf("Connection closed by server\n");
+void set_nonblocking(int sock) {
+    int flags = fcntl(sock, F_GETFL, 0);
+    if (flags == -1) {
+        perror("Failed to get socket flags");
         exit(EXIT_FAILURE);
-    } else if (bytes_received < 0) {
-        if (errno != EAGAIN && errno != EWOULDBLOCK) {
-            perror("Error receiving data");
-            exit(EXIT_FAILURE);
-        }
-        return;
     }
 
-    buffer[bytes_received] = '\0'; // Null-terminate the received string
+    flags |= O_NONBLOCK;
+    if (fcntl(sock, F_SETFL, flags) == -1) {
+        perror("Failed to set socket to non-blocking");
+        exit(EXIT_FAILURE);
+    }
+}
+
+char* get_update(int sock) {
+    char buffer[1024];
+    int bytes_received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+
+    // Check if connection is closed or no data is received
+    if (bytes_received == 0) {
+        printf("Connection closed by server\n");
+        return NULL;
+    } else if (bytes_received < 0) {
+        // Non-blocking case: no data available at the moment
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return NULL;
+        }
+        // Other errors
+        perror("Error receiving data");
+        return NULL;
+    }
+
+    // Allocate memory for the JSON data
+    char *json_data = malloc(bytes_received + 1);
+    if (!json_data) {
+        perror("Failed to allocate memory for JSON data");
+        return NULL;
+    }
+
+    // Copy received data to the allocated memory, ensuring null termination
+    strncpy(json_data, buffer, bytes_received);
+    json_data[bytes_received] = '\0';  // Explicitly add null terminator
+
+    return json_data;
 }
 
 void handle_json_message(const char *json_string) {
     struct json_object *parsed_json;
     struct json_object *brick_index;
+    struct json_object *action;
     struct json_object *extra_life;
     struct json_object *increase_ball_speed;
     struct json_object *decrease_ball_speed;
@@ -149,6 +183,9 @@ void handle_json_message(const char *json_string) {
     struct json_object *increase_ball;
     struct json_object *color;
     struct json_object *score;
+    struct json_object *player_position;
+    struct json_object *ball_position_x;
+    struct json_object *ball_position_y;
 
     parsed_json = json_tokener_parse(json_string);
     if (!parsed_json) {
@@ -158,6 +195,7 @@ void handle_json_message(const char *json_string) {
 
     json_object_object_get_ex(parsed_json, "brick_index", &brick_index);
     json_object_object_get_ex(parsed_json, "extra_life", &extra_life);
+    json_object_object_get_ex(parsed_json, "action", &action);
     json_object_object_get_ex(parsed_json, "increase_ball_speed", &increase_ball_speed);
     json_object_object_get_ex(parsed_json, "decrease_ball_speed", &decrease_ball_speed);
     json_object_object_get_ex(parsed_json, "double_racket", &double_size_racket);
@@ -165,9 +203,13 @@ void handle_json_message(const char *json_string) {
     json_object_object_get_ex(parsed_json, "add_ball", &increase_ball);
     json_object_object_get_ex(parsed_json, "color", &color);
     json_object_object_get_ex(parsed_json, "score", &score);
+    json_object_object_get_ex(parsed_json, "player_position", &player_position);
+    json_object_object_get_ex(parsed_json, "ball_position_x", &ball_position_x);
+    json_object_object_get_ex(parsed_json, "ball_position_y", &ball_position_y);
 
     int index = json_object_get_int(brick_index);
     bool extraLife = json_object_get_boolean(extra_life);
+    const char *action = json_object_get_boolean(action);
     bool increaseSpeed = json_object_get_boolean(increase_ball_speed);
     bool decreaseSpeed = json_object_get_boolean(decrease_ball_speed);
     bool doubleRacket = json_object_get_boolean(double_size_racket);
@@ -175,6 +217,11 @@ void handle_json_message(const char *json_string) {
     bool addBall = json_object_get_boolean(increase_ball);
     const char *color_str = json_object_get_string(color);
     int updated_score = json_object_get_int(score);
+
+    // estas son variable globales (vomita)
+    playerpos = json_object_get_int(player_position);
+    ballx = json_object_get_int(ball_position_x);
+    bally = json_object_get_int(ball_position_y);
 
     for (int i = 0; i < bricks.size; i++) {
         Brick *brick = &bricks.data[i];
@@ -295,12 +342,12 @@ void Game_update(int sock) {
     //Verifica fin de la partida
     if (gg) return;
 
-    char buffer[1024]; // Buffer para recibir el JSON
-    receive_json(sock, buffer, sizeof(buffer));  // Recibe datos sin bloquear
+    char *message = get_update(sock);  // Recibe datos sin bloquear
 
     // Si hay datos, procesarlos
-    if (buffer[0] != '\0') {
-        handle_json_message(buffer);  // Procesa los datos del servidor (activa poderes)
+    if (message) {
+        handle_json_message(message);  // Procesa los datos del servidor (activa poderes)
+        free(message); // se hace malloc para retornar el message, liberar
     }
 
     //Control del jugador sobre la barra de juego.
@@ -527,6 +574,8 @@ void Game_shutdown() { //Se libera toda la data almacenada sobre los bloques en 
 int main(void) {
 
     int sock = serverconnect();
+
+    set_nonblocking(sock);
 
     InitWindow(screen_w, screen_h, "breakOutTec"); //Se carga la pantalla del juego
 
